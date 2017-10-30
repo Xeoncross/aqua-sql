@@ -2,6 +2,14 @@
 const Bcrypt = require('bcrypt');
 const Async = require('async');
 
+/*
+767 bytes is the stated prefix limitation for InnoDB tables in MySQL version <= 5.6.
+In MySQL version 5.7 and upwards this limit has been increased to 3072 bytes. When we upgrade we can remove this.
+
+The maximum length of a utf8mb4 character is four bytes. So you have to divide the max index prefix length of 767 bytes (soon 3072 bytes) by 4 resulting in 191.
+*/
+const MAX_SQL_VARCHAR_LENGTH = 191;
+
 module.exports = function (sequelize, DataTypes){
 
     const _hashPassword = function (user, options, cb){
@@ -30,13 +38,13 @@ module.exports = function (sequelize, DataTypes){
             type: DataTypes.UUID
         },
         isActive: DataTypes.BOOLEAN,
-        username: { type:DataTypes.STRING, allowNull: false, validate: { isLowercase: true, min: 4 } },
-        password_hash: { type:DataTypes.STRING },//, allowNull: false, validate: { min: 20} ,
+        username: { type:DataTypes.STRING(MAX_SQL_VARCHAR_LENGTH), allowNull: false, validate: { isLowercase: true, min: 4 } },
+        password_hash: { type:DataTypes.STRING(MAX_SQL_VARCHAR_LENGTH) },//, allowNull: false, validate: { min: 20} ,
         password: {
             type: DataTypes.VIRTUAL
         },
-        email: { type:DataTypes.STRING, allowNull: false, unique: true, validate: { isEmail: true } },
-        reset_token: { type:DataTypes.STRING },
+        email: { type:DataTypes.STRING(MAX_SQL_VARCHAR_LENGTH), allowNull: false, unique: true, validate: { isEmail: true } },
+        reset_token: { type:DataTypes.STRING(MAX_SQL_VARCHAR_LENGTH) },
         reset_expires: { type:DataTypes.DATE }
     },{
         hooks: {
