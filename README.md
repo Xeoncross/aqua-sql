@@ -11,7 +11,7 @@ Node conventions that I missed.
 
 All feedback is welcome.
 
-Finally a huge thank you to [Reza Akhava](https://twitter.com/jedireza) for  [Aqua](https://jedireza.github.io/aqua/).
+Finally a huge thank you to [Reza Akhava](https://twitter.com/jedireza) for [Aqua](https://jedireza.github.io/aqua/).
 
 
 [![Build Status](https://travis-ci.org/jimlowrey/aqua-sql.svg?branch=master)](https://travis-ci.org/jimlowrey/aqua-sql)
@@ -35,7 +35,12 @@ Finally a huge thank you to [Reza Akhava](https://twitter.com/jedireza) for  [Aq
 ## Technology
 
 Server side, Aqua is built with the [hapi](https://hapijs.com/) framework.
-We're using [Postgres](https://www.postgresql.org/) as a data store.
+We support multiple SQL databases:
+
+- [Postgres](https://www.postgresql.org/)
+- [MySQL](https://www.mysql.com/)
+- [MariaDB](https://mariadb.org/)
+- [SQLite](https://www.sqlite.org/) *Work in Progress*
 
 The front-end is built with [React](https://github.com/facebook/react). We use
 [Redux](https://github.com/reactjs/redux) as our state container. Client side
@@ -58,8 +63,8 @@ If you don't use React and/or would rather bring your own front-end, checkout
 
 ## Requirements
 
-You need [Node.js](http://nodejs.org/download/) installed and you'll need
-[Postgres](https://www.postgresql.org/) installed and running.
+You need [Node.js](http://nodejs.org/download/) installed and you'll need and
+Open Source SQL database installed and running.
 
 We use [`bcrypt`](https://github.com/ncb000gt/node.bcrypt.js) for hashing
 secrets. If you have issues during installation related to `bcrypt` then [refer
@@ -74,6 +79,8 @@ $ git clone git@github.com:jimlowrey/aqua-sql.git
 $ cd aqua-sql
 $ npm install
 ```
+
+## Postgres Installation
 
 Paste the following into PSQL console.  The passwords will both be test.
 ```sql
@@ -102,16 +109,27 @@ CREATE DATABASE aqua_test
        CONNECTION LIMIT = -1;
 ```
 
+## MySQL/MariaDB Installation
+
+```
+CREATE DATABASE aqua character set utf8mb4 collate utf8mb4_general_ci;
+CREATE DATABASE aqua_test character set utf8mb4 collate utf8mb4_general_ci;
+
+CREATE USER 'deploy'@'localhost' IDENTIFIED BY '...';
+GRANT ALL PRIVILEGES on aqua . * to 'deploy'@'localhost';
+GRANT ALL PRIVILEGES on aqua_test . * to 'deploy'@'localhost';
+flush privileges;
+```
 
 ## Configuration
 
-Simply edit `config.js`. The configuration uses
+Copy `sample.config.js` to `config.js` and edit to include your database and
+other credentials. The configuration uses
 [`confidence`](https://github.com/hapijs/confidence) which makes it easy to
-manage configuration settings across environments. __Don't store secrets in
-this file or commit them to your repository.__
+manage configuration settings across environments. __Don't commit `config.js`
+to your repository.__
 
-__Instead, access secrets via environment variables.__ We use
-[`dotenv`](https://github.com/motdotla/dotenv) to help make setting local
+We use [`dotenv`](https://github.com/motdotla/dotenv) to help make setting local
 environment variables easy (not to be used in production).
 
 Simply copy `.env-sample` to `.env` and edit as needed. __Don't commit `.env`
