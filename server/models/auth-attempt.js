@@ -2,31 +2,48 @@
 const Async = require('async');
 const Config = require('../../config');
 
-module.exports = function (sequelize, DataTypes){
-
-    const AuthAttempt = sequelize.define('AuthAttempt', {
-        id: {
-            primaryKey: true,
-            defaultValue: DataTypes.UUIDV1,
-            type: DataTypes.UUID
+module.exports = function (sequelize, DataTypes) {
+    const AuthAttempt = sequelize.define(
+        'AuthAttempt',
+        {
+            id: {
+                primaryKey: true,
+                defaultValue: DataTypes.UUIDV1,
+                type: DataTypes.UUID
+            },
+            username: {
+                type: DataTypes.STRING,
+                allowNull: false,
+                validate: { min: 1 }
+            },
+            ip: {
+                type: DataTypes.STRING,
+                allowNull: false,
+                validate: { min: 1 }
+            }
         },
-        username: { type:DataTypes.STRING, allowNull: false, validate: { min: 1 } },
-        ip: { type:DataTypes.STRING, allowNull: false, validate: { min: 1 } }
-    },{
-        classMethods : {
-            pagedFind: function (where, page, limit, order, include, callback){
+        {
+            classMethods: {}
+        }
+    );
 
-                const offset = (page - 1) * limit;
-                this.findAndCount(
-                    {
-                        where,
-                        offset,
-                        limit,
-                        order,
-                        include
-                    }
-            ).then( (result) => {
-
+    AuthAttempt.pagedFind = function (
+        where,
+        page,
+        limit,
+        order,
+        include,
+        callback
+    ) {
+        const offset = (page - 1) * limit;
+        this.findAndCount({
+            where,
+            offset,
+            limit,
+            order,
+            include
+        }).then(
+            (result) => {
                 const output = {
                     data: undefined,
                     pages: {
@@ -39,7 +56,7 @@ module.exports = function (sequelize, DataTypes){
                     },
                     items: {
                         limit,
-                        begin: ((page * limit) - limit) + 1,
+                        begin: page * limit - limit + 1,
                         end: page * limit,
                         total: 0
                     }
@@ -61,64 +78,68 @@ module.exports = function (sequelize, DataTypes){
                 }
 
                 callback(null, output);
-
-
-            }, (err) => {
-
-                return callback(err);
-            });
-
             },
-            abuseDetected: function (ip, username, callback){
+            (err) => {
+                return callback(err);
+            }
+        );
+    };
 
-                const self = this;
+    AuthAttempt.abuseDetected = function (ip, username, callback) {
+        const self = this;
 
-                Async.auto({
-                    abusiveIpCount: function (done) {
-
-                        self.count({
+        Async.auto(
+            {
+                abusiveIpCount: function (done) {
+                    self
+                        .count({
                             where: {
                                 ip
                             }
-                        }).then((count) => {
-
-                            done(null, count);
-                        }, (err) => {
-
-                            done(err);
-                        });
-                    },
-                    abusiveIpUserCount: function (done) {
-
-                        self.count({
+                        })
+                        .then(
+                            (count) => {
+                                done(null, count);
+                            },
+                            (err) => {
+                                done(err);
+                            }
+                        );
+                },
+                abusiveIpUserCount: function (done) {
+                    self
+                        .count({
                             where: {
                                 ip,
                                 username: username.toLowerCase()
                             }
-                        }).then((count) => {
+                        })
+                        .then(
+                            (count) => {
+                                done(null, count);
+                            },
+                            (err) => {
+                                done(err);
+                            }
+                        );
+                }
+            },
+            (err, results) => {
+                if (err) {
+                    return callback(err);
+                }
 
-                            done(null, count);
-                        }, (err) => {
+                const authAttemptsConfig = Config.get('/authAttempts');
+                const ipLimitReached =
+                    results.abusiveIpCount >= authAttemptsConfig.forIp;
+                const ipUserLimitReached =
+                    results.abusiveIpUserCount >=
+                    authAttemptsConfig.forIpAndUser;
 
-                            done(err);
-                        });
-                    }
-                }, (err, results) => {
-
-                    if (err) {
-                        return callback(err);
-                    }
-
-                    const authAttemptsConfig = Config.get('/authAttempts');
-                    const ipLimitReached = results.abusiveIpCount >= authAttemptsConfig.forIp;
-                    const ipUserLimitReached = results.abusiveIpUserCount >= authAttemptsConfig.forIpAndUser;
-
-                    callback(null, ipLimitReached || ipUserLimitReached);
-                });
-
+                callback(null, ipLimitReached || ipUserLimitReached);
             }
-        }
-    });
+        );
+    };
 
     return AuthAttempt;
 };

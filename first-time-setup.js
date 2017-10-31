@@ -265,6 +265,8 @@ Async.auto(
                             'createAdmin',
                             'createAdminGroup',
                             function (iresults, done) {
+                              console.log(Object.keys(iresults));
+
                                 iresults.createAdminGroup
                                     .setAdmins(iresults.createAdmin)
                                     .then(

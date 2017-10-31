@@ -3,32 +3,33 @@ const Async = require('async');
 const Bcrypt = require('bcrypt');
 const Uuid = require('uuid');
 
-module.exports = function (sequelize, DataTypes){
-
-    const Session = sequelize.define('Session', {
-        id: {
-            primaryKey: true,
-            defaultValue: DataTypes.UUIDV1,
-            type: DataTypes.UUID
+module.exports = function (sequelize, DataTypes) {
+    const Session = sequelize.define(
+        'Session',
+        {
+            id: {
+                primaryKey: true,
+                defaultValue: DataTypes.UUIDV1,
+                type: DataTypes.UUID
+            },
+            userId: DataTypes.UUID,
+            key: { type: DataTypes.STRING, allowNull: false }
         },
-        userId: DataTypes.UUID,
-        key: { type:DataTypes.STRING, allowNull: false }
-    },{
-        classMethods : {
+        {
+            classMethods: {}
+        }
+    );
 
-            pagedFind: function (where, page, limit, order, include, callback){
-
-                const offset = (page - 1) * limit;
-                this.findAndCount(
-                    {
-                        where,
-                        offset,
-                        limit,
-                        order,
-                        include
-                    }
-            ).then( (result) => {
-
+    Session.pagedFind = function (where, page, limit, order, include, callback) {
+        const offset = (page - 1) * limit;
+        this.findAndCount({
+            where,
+            offset,
+            limit,
+            order,
+            include
+        }).then(
+            (result) => {
                 const output = {
                     data: undefined,
                     pages: {
@@ -41,7 +42,7 @@ module.exports = function (sequelize, DataTypes){
                     },
                     items: {
                         limit,
-                        begin: ((page * limit) - limit) + 1,
+                        begin: page * limit - limit + 1,
                         end: page * limit,
                         total: 0
                     }
@@ -63,128 +64,141 @@ module.exports = function (sequelize, DataTypes){
                 }
 
                 callback(null, output);
-
-
-            }, (err) => {
-
+            },
+            (err) => {
                 return callback(err);
-            });
-            },
-            generateKeyHash: function (callback){
+            }
+        );
+    };
 
-                const key = Uuid.v4();
+    Session.generateKeyHash = function (callback) {
+        const key = Uuid.v4();
 
-                Async.auto({
-                    salt: function (done) {
-
-                        Bcrypt.genSalt(10, done);
-                    },
-                    hash: ['salt', function (results, done) {
-
+        Async.auto(
+            {
+                salt: function (done) {
+                    Bcrypt.genSalt(10, done);
+                },
+                hash: [
+                    'salt',
+                    function (results, done) {
                         Bcrypt.hash(key, results.salt, done);
-                    }]
-                }, (err, results) => {
-
-                    if (err) {
-                        return callback(err);
                     }
-
-                    callback(null, {
-                        key,
-                        hash: results.hash
-                    });
-                });
+                ]
             },
-            createNew: function (userId, callback) {
+            (err, results) => {
+                if (err) {
+                    return callback(err);
+                }
 
-                const self = this;
+                callback(null, {
+                    key,
+                    hash: results.hash
+                });
+            }
+        );
+    };
+    Session.createNew = function (userId, callback) {
+        const self = this;
 
-                Async.auto({
-                    keyHash: function (done){
-
-                        self.generateKeyHash(done);
-                    },
-                    newSession: ['keyHash', function (results, done) {
-
-                        self.create({
-                            userId,
-                            key: results.keyHash.hash
-                        }).then((session) => {
-
-                            console.log('session is ', session.key);
-                            done(null,session);
-                        }, (err) => {
-
-                            done(err);
-                        });
-                    }],
-                    clean: ['newSession', function (results, done) {
-
-                        self.destroy({
-                            where: {
+        Async.auto(
+            {
+                keyHash: function (done) {
+                    self.generateKeyHash(done);
+                },
+                newSession: [
+                    'keyHash',
+                    function (results, done) {
+                        self
+                            .create({
                                 userId,
-                                key: { $ne: results.keyHash.hash }
-                            }
-                        }).then(() => {
-
-                            done(null);
-                        }, (err) => {
-
-                            done(err);
-                        });
-                    }]
-                }, (err, results) => {
-
-                    if (err) {
-                        return callback(err);
+                                key: results.keyHash.hash
+                            })
+                            .then(
+                                (session) => {
+                                    console.log('session is ', session.key);
+                                    done(null, session);
+                                },
+                                (err) => {
+                                    done(err);
+                                }
+                            );
                     }
-
-                    console.log('new session', results.newSession.key);
-                    results.newSession.key = results.keyHash.key;
-                    console.log('new session', results.newSession.key);
-
-                    callback(null, results.newSession);
-                });
+                ],
+                clean: [
+                    'newSession',
+                    function (results, done) {
+                        self
+                            .destroy({
+                                where: {
+                                    userId,
+                                    key: { $ne: results.keyHash.hash }
+                                }
+                            })
+                            .then(
+                                () => {
+                                    done(null);
+                                },
+                                (err) => {
+                                    done(err);
+                                }
+                            );
+                    }
+                ]
             },
-            findByCredentials: function (id, key, callback) {
+            (err, results) => {
+                if (err) {
+                    return callback(err);
+                }
 
-                const self = this;
+                console.log('new session', results.newSession.key);
+                results.newSession.key = results.keyHash.key;
+                console.log('new session', results.newSession.key);
 
-                Async.auto({
-                    session: function (done) {
+                callback(null, results.newSession);
+            }
+        );
+    };
+    Session.findByCredentials = function (id, key, callback) {
+        const self = this;
 
-                        self.findById(id).then((session) => {
-
+        Async.auto(
+            {
+                session: function (done) {
+                    self.findById(id).then(
+                        (session) => {
                             done(null, session);
-                        }, (err) => {
-
+                        },
+                        (err) => {
                             done(err);
-                        });
-                    },
-                    keyMatch: ['session', function (results, done) {
-
+                        }
+                    );
+                },
+                keyMatch: [
+                    'session',
+                    function (results, done) {
                         if (!results.session) {
                             return done(null, false);
                         }
 
                         const source = results.session.key;
                         Bcrypt.compare(key, source, done);
-                    }]
-                }, (err, results) => {
-
-                    if (err) {
-                        return callback(err);
                     }
+                ]
+            },
+            (err, results) => {
+                if (err) {
+                    return callback(err);
+                }
 
-                    if (results.keyMatch) {
-                        return callback(null, results.session);
-                    }
+                if (results.keyMatch) {
+                    return callback(null, results.session);
+                }
 
-                    callback();
-                });
+                callback();
             }
-        }
-    });
+        );
+    };
 
     return Session;
 };
